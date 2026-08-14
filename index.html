@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cloud IoT Monitoring Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 24px; }
+  h1 { color: #38bdf8; }
+  .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+  .card { background: #1e293b; padding: 16px 24px; border-radius: 10px; flex: 1; }
+  .card h2 { margin: 0 0 8px 0; font-size: 14px; color: #94a3b8; }
+  .card p { margin: 0; font-size: 28px; font-weight: bold; }
+  .chart-container { background: #1e293b; padding: 16px; border-radius: 10px; margin-bottom: 24px; }
+  #alerts { background: #1e293b; padding: 16px; border-radius: 10px; }
+  .alert-item { color: #f87171; padding: 4px 0; border-bottom: 1px solid #334155; }
+</style>
+</head>
+<body>
+  <h1>🌐 Cloud-Based IoT Monitoring Dashboard</h1>
+
+  <div class="cards">
+    <div class="card"><h2>Latest Temperature (°C)</h2><p id="curTemp">--</p></div>
+    <div class="card"><h2>Latest Humidity (%)</h2><p id="curHum">--</p></div>
+    <div class="card"><h2>Device</h2><p id="curDevice">--</p></div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="chart" height="90"></canvas>
+  </div>
+
+  <div id="alerts">
+    <h2>⚠️ Alerts (Temp > 35°C)</h2>
+    <div id="alertList">No alerts</div>
+  </div>
+
+<script>
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Temperature (°C)', data: [], borderColor: '#f87171', tension: 0.3 },
+      { label: 'Humidity (%)', data: [], borderColor: '#38bdf8', tension: 0.3 }
+    ]
+  },
+  options: { responsive: true, scales: { y: { beginAtZero: true } } }
+});
+
+async function refresh() {
+  const res = await fetch('/api/data?limit=20');
+  const data = await res.json();
+  if (data.length) {
+    chart.data.labels = data.map(d => d.timestamp.slice(11, 19));
+    chart.data.datasets[0].data = data.map(d => d.temperature);
+    chart.data.datasets[1].data = data.map(d => d.humidity);
+    chart.update();
+
+    const latest = data[data.length - 1];
+    document.getElementById('curTemp').innerText = latest.temperature;
+    document.getElementById('curHum').innerText = latest.humidity;
+    document.getElementById('curDevice').innerText = latest.device_id;
+  }
+
+  const alertRes = await fetch('/api/alerts');
+  const alerts = await alertRes.json();
+  const list = document.getElementById('alertList');
+  list.innerHTML = alerts.length
+    ? alerts.map(a => `<div class="alert-item">${a.device_id}: ${a.temperature}°C at ${a.timestamp}</div>`).join('')
+    : 'No alerts';
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
